@@ -1,32 +1,50 @@
 import phonenumbers
-from phonenumbers import geocoder
-from phonenumbers import carrier
+from phonenumbers import geocoder, carrier
 import folium
 from opencage.geocoder import OpenCageGeocode
+import os
 
-testnumber  = input("Please input your test number: ")
+def get_location_and_provider(phone_number):
+    try:
+        phone_number_parsed = phonenumbers.parse(phone_number)
+        location = geocoder.description_for_number(phone_number_parsed, "en")
+        service_provider = carrier.name_for_number(phone_number_parsed, "en")
+        return location, service_provider
+    except phonenumbers.NumberParseException:
+        return None, None
 
-test = phonenumbers.parse(testnumber)
+def get_coordinates(location, api_key):
+    geocoder = OpenCageGeocode(api_key)
+    results = geocoder.geocode(location)
+    if results:
+        latitude = results[0]["geometry"]['lat']
+        longitude = results[0]["geometry"]['lng']
+        return latitude, longitude
+    else:
+        return None, None
 
-mylocation = geocoder.description_for_number(test, "en")
-service_prov = carrier.name_for_number(test, "en")
-print(f"{mylocation} provider is {service_prov}")
+def create_map(coordinates, location):
+    my_map = folium.Map(location=coordinates, zoom_start=10)
+    folium.Marker(coordinates, popup=location).add_to(my_map)
+    my_map.save("finishedlocal.html")
 
-key = 'abc'
-geocoder = OpenCageGeocode(key)
-query = str(mylocation)
+def main():
+    test_number = input("Please input your test number: ")
+    location, service_provider = get_location_and_provider(test_number)
 
-results = geocoder.geocode(query)
-print(results)
+    if location and service_provider:
+        print(f"{location} provider is {service_provider}")
 
-latitude = results[0]["geometry"]['lat']
-longitude = results[0]["geometry"]['lng']
+        api_key = os.getenv('OPENCAGE_API_KEY', 'your_default_api_key')
+        latitude, longitude = get_coordinates(location, api_key)
 
-L1_location = [latitude, longitude]
+        if latitude and longitude:
+            print(f"Location Coordinates: {latitude}, {longitude}")
+            create_map([latitude, longitude], location)
+        else:
+            print("Geocoding failed.")
+    else:
+        print("Invalid phone number or parsing failed.")
 
-print(L1_location)
-
-myMap = folium.Map(location=L1_location, zoom_start=10)
-
-folium.Marker(L1_location, popup=mylocation).add_to((myMap))
-myMap.save("finishedlocal.html")
+if __name__ == "__main__":
+    main()
